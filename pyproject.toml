@@ -13,3 +13,8 @@ dependencies = [
     "robyn>=0.88.0",
     "sqlalchemy>=2.0.51",
 ]
+
+[tool.uv.workspace]
+members = [
+    "07_semana/clase_practica",
+]
