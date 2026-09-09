@@ -5,6 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "ipython>=9.17.1",
     "pandas>=3.0.5",
     "psycopg2-binary>=2.9.12",
     "pyngrok>=8.1.2",
