@@ -84,6 +84,91 @@ print("\nShape:", df.shape)
 
 ```python
 df["precio_usd"].describe()
+
+# Cálculo de estadísticos clave
+media = df["precio_usd"].mean()
+mediana = df["precio_usd"].median()
+std = df["precio_usd"].std()
+
+q1 = df["precio_usd"].quantile(0.25)
+q3 = df["precio_usd"].quantile(0.75)
+iqr = q3 - q1
+
+limite_inferior = q1 - 1.5 * iqr
+limite_superior = q3 + 1.5 * iqr
+
+# Detección de outliers según la regla del IQR
+# (En precios normalmente interesan los que superan el límite superior)
+mask_outliers_sup = df["precio_usd"] > limite_superior
+n_outliers = mask_outliers_sup.sum()
+pct_outliers = (n_outliers / len(df["precio_usd"].dropna())) * 100
+
+# Presentación estructurada en DataFrame
+resumen = pd.DataFrame(
+    {
+        "Métrica": [
+            "Media",
+            "Mediana",
+            "Desv. estándar",
+            "Q1",
+            "Q3",
+            "IQR",
+            "Límite superior (Q3 + 1.5·IQR)",
+            "Outliers detectados",
+        ],
+        "Valor": [
+            f"USD {media:,.3f}",
+            f"USD {mediana:,.3f}",
+            f"USD {std:,.3f}",
+            f"{q1:,.3f}",
+            f"{q3:,.3f}",
+            f"{iqr:,.3f}",
+            f"{limite_superior:,.3f}",
+            f"{n_outliers} ({pct_outliers:.1f}%)",
+        ],
+    }
+)
+
+resumen.to_string(index=False)
+
+# Check grafico
+import plotly.graph_objects as go
+
+fig = go.Figure()
+
+# Boxplot interactivo con todos los puntos y outliers destacados
+fig.add_trace(
+    go.Box(
+        y=df["precio_usd"],
+        name="precio_usd",
+        boxpoints="outliers",  # Solo grafica puntos fuera de los bigotes
+        marker_color="#2b5c8f",
+        line_color="#1f3b5c",
+        boxmean=True,  # Dibuja la media con una línea punteada dentro de la caja
+        hovertemplate="Valor: USD %{y:,.2f}<extra></extra>",
+    )
+)
+
+# Línea de referencia del umbral superior (Q3 + 1.5 * IQR)
+fig.add_hline(
+    y=limite_superior,
+    line_dash="dash",
+    line_color="#d9534f",
+    annotation_text=f"Límite sup: USD {limite_superior:,.2f}",
+    annotation_position="top right",
+)
+
+fig.update_layout(
+    title="Distribución de precio_usd y Detección de Outliers",
+    yaxis_title="Precio (USD)",
+    template="plotly_white",
+    showlegend=False,
+    width=600,
+    height=500,
+)
+
+fig.show()
+
 ```
 
 | Métrica | Valor |
@@ -110,6 +195,11 @@ df["precio_usd"].describe()
 | Casa | 216 | 36% |
 | PH | 126 | 21% |
 
+
+```python
+df.tipo_propiedad.value(normalize=True)
+```
+
 **Hallazgo:** el mercado está dominado por departamentos; los PH son el segmento minoritario — dato relevante antes de comparar precios por tipo (8.2-B), porque ese grupo tendrá menos poder estadístico.
 
 ---
@@ -119,7 +209,7 @@ df["precio_usd"].describe()
 ### A) Numérica vs Numérica — `metros_cuadrados` vs `precio_usd`
 
 ```python
-from scipy import stats
+from scipy.stats import pearsonr
 r, p = stats.pearsonr(df["metros_cuadrados"], df["precio_usd"])
 ```
 
@@ -130,6 +220,7 @@ r, p = stats.pearsonr(df["metros_cuadrados"], df["precio_usd"])
 ### B) Categórica vs Numérica — `tipo_propiedad` vs `precio_usd` (ANOVA)
 
 ```python
+from scipy.stats import f_oneway
 grupos = [g["precio_usd"].values for _, g in df.groupby("tipo_propiedad")]
 f, p = stats.f_oneway(*grupos)
 ```
@@ -142,7 +233,62 @@ f, p = stats.f_oneway(*grupos)
 
 **Resultado ANOVA:** F = 5.12, p = 0.006
 
+ANOVA no mira solo los promedios; mira la varianza (la dispersión). Compara qué tan separados están los promedios de los grupos entre sí (variabilidad entre grupos) contra qué tan dispersos están los precios dentro de cada misma bolsa (variabilidad dentro de los grupos).
+
+Si la distancia entre los grupos es mucho mayor que la dispersión interna, ANOVA te dice: "Sí, el tipo de propiedad influye en el precio (p-valor < 0.05)".
+
+El problema de ANOVA: Es una prueba global. Te dice que hay una diferencia, pero no te dice dónde. No sabés si las Casas son más caras que los Departamentos, si los PHs se diferencian de las Casas, o si los tres son completamente distintos entre sí. Para resolver esto, usamos la Prueba de Tukey.
+
+
 **Pregunta → Hallazgo:** *¿El tipo de propiedad influye en el precio?* Sí, la diferencia entre grupos es estadísticamente significativa (p<0.05): las casas son en promedio ~19% más caras que los PH. Un boxplot agrupado confirmaría visualmente que la distribución de "Casa" está desplazada hacia arriba.
+
+**Tukey  → La Prueba Post-Hoc de Tukey (HSD)**
+La prueba de Tukey (Honestly Significant Difference) compara todos los pares posibles de grupos uno por uno (Casas vs. Deptos, Casas vs. PHs, Deptos vs. PHs) y corrige el margen de error estadístico para que no cometamos falsos positivos al hacer múltiples comparaciones.
+
+
+```python
+import statsmodels.api as sm
+from statsmodels.stats.multicomp import pairwise_tukeyhsd
+
+# Ejecutar la prueba de Tukey
+# 1° argumento: la variable numérica (precios)
+# 2° argumento: la variable categórica (grupos)
+# alpha=0.05 es el nivel de significancia estándar (95% de confianza)
+tukey = pairwise_tukeyhsd(endog=df['precio_usd'],
+                          groups=df['tipo_propiedad'],
+                          alpha=0.05)
+
+tukey
+
+```
+**Tukey**
+La interpretacion :
+
+Vamos a interpretarlos de forma sencilla mirando la columna clave: reject (que te dice si rechazamos la idea de que son iguales) y meandiff (la diferencia de precios).
+
+Aquí está la conclusión de tus datos:
+## 1. Casa vs. Departamento (reject: True)
+
+* Resultado: Sí hay una diferencia significativa en el precio promedio.
+* Interpretación: La diferencia (meandiff) es de -$12,863.31. Como el número es negativo, significa que los Departamentos son, en promedio, unos 12,863 dólares más baratos que las Casas (o visto al revés, las Casas son significativamente más caras). El p-valor (p-adj: 0.0193) es menor a 0.05, lo que valida estadísticamente esta brecha.
+
+## 2. Casa vs. PH (reject: True)
+
+* Resultado: Sí hay una diferencia significativa en el precio promedio.
+* Interpretación: La diferencia es de -$15,843.80. Esto nos indica que los PHs son, en promedio, unos 15,843 dólares más baratos que las Casas. Al igual que el caso anterior, el p-valor (0.0174) confirma que no es una diferencia por casualidad.
+
+## 3. Departamento vs. PH (reject: False)
+
+* Resultado: No hay una diferencia significativa.
+* Interpretación: Aunque en tu muestra el promedio de los PHs dió unos $2,980 dólares menos que los departamentos (meandiff: -2980.48), estadísticamente se consideran similares. El p-valor es muy alto (p-adj: 0.8559), lo que significa que la dispersión de precios dentro de ambos grupos es tan grande que no podemos asegurar que un tipo sea realmente más caro que el otro en el mercado general.
+
+------------------------------
+## Resumen del Mercado
+Tus datos demuestran que el mercado se divide en dos escalones claros:
+
+   1. Las Casas están en la cima (son el grupo significativamente más caro).
+   2. Los Departamentos y los PHs comparten el escalón inferior, teniendo precios promedio muy similares entre sí desde el punto de vista estadístico.
+
 
 ### C) Categórica vs Categórica — `barrio` vs `tipo_propiedad` (Chi-cuadrado)
 
@@ -220,9 +366,36 @@ df[["metros_cuadrados","precio_usd","impuestos_anuales_usd"]].corr()
 
 ## 8.4 Tips en acción
 
-### Tip 1 — Ya cubierto arriba (antigüedad vs precio, relación en U)
+###  Paradoja de Simpson
 
-### Tip 2 — Paradoja de Simpson
+La paradoja de Simpson es un fenómeno estadístico en el cual una tendencia que aparece en varios grupos de datos desaparece o se invierte completamente cuando los grupos se combinan.
+Ocurre generalmente cuando hay una variable oculta (llamada variable de confusión) que afecta los resultados y que no se está teniendo en cuenta a simple vista.
+------------------------------
+## Un ejemplo clásico para entenderlo (El sesgo de UC Berkeley)
+El caso real más famoso ocurrió en 1973 en la Universidad de California, Berkeley, cuando fueron acusados de discriminar a las mujeres en las admisiones de posgrado.
+Si mirabas los datos globales, la tendencia parecía clara:
+
+* Hombres aceptados: 44% [1]
+* Mujeres aceptadas: 35% [1]
+
+A simple vista, parecía haber un sesgo a favor de los hombres. Sin embargo, cuando los estadísticos analizaron los datos departamento por departamento (es decir, abriendo los grupos), descubrieron algo sorprendente: en la mayoría de las facultades, las mujeres tenían una tasa de aceptación igual o superior a la de los hombres.
+## ¿Por qué pasó esto? (La variable oculta)
+La variable de confusión fue el tipo de carrera al que postulaban:
+
+* Las mujeres tendían a postularse masivamente a departamentos muy competitivos con tasas de aceptación muy bajas (como Humanidades), donde casi todos (hombres y mujeres) eran rechazados.
+* Los hombres tendían a postularse a departamentos con cuotas de aceptación muy altas (como Ingeniería o Ciencias), donde casi todos eran aceptados.
+
+Al combinar todos los datos en una sola bolsa, el gran volumen de mujeres rechazadas en carreras difíciles hizo que la tasa general femenina se desplomara, creando una ilusión óptica estadística.
+------------------------------
+## ¿Cómo se aplica a tus datos de propiedades?
+Imaginá que estás analizando el precio por metro cuadrado ($/m²) de Casas y Departamentos, y descubrís lo siguiente:
+
+* En el Barrio A: El m² de las Casas es más barato que el de los Departamentos.
+* En el Barrio B: El m² de las Casas también es más barato que el de los Departamentos.
+
+Sin embargo, al juntar todo el DataFrame sin separar por barrios, el resultado global te dice que las Casas tienen el m² más caro que los Departamentos.
+Esto pasaría si el Barrio B es un barrio de super lujo (donde todo es carísimo y hay muchísimas Casas) y el Barrio A es un barrio muy económico (donde hay casi puros Departamentos). La ubicación actúa como la variable oculta que altera la conclusión general.
+Para ver si esto impacta en tu proyecto, decime:
 
 Con el mismo espíritu del dataset (dos "agencias" vendiendo propiedades, y la variable "se vendió en menos de 60 días"), armé una tabla clásica de paradoja de Simpson:
 
@@ -233,8 +406,6 @@ Con el mismo espíritu del dataset (dos "agencias" vendiendo propiedades, y la v
 | **Agencia Y** | 234/270 | 86.7% | 55/80 | 68.8% | **82.6%** |
 
 **Pregunta → Hallazgo:** *¿Qué agencia vende más rápido?* Mirando el total, Agencia Y parece mejor (82.6% vs 78.0%). Pero **segmentando por tipo de propiedad, Agencia X es mejor en ambos segmentos** (93.1%>86.7% en Departamento, 73.0%>68.8% en Casa). La paradoja ocurre porque Agencia Y vendió mucho más volumen de Departamentos (el segmento "fácil" de vender rápido), inflando su promedio total. **Conclusión práctica:** nunca decidas qué agencia contratar mirando solo el total agregado — siempre desagregá por la variable oculta (aquí, el mix de tipo de propiedad que maneja cada una).
-
-### Tip 3 — Ya cubierto arriba (multicolinealidad impuestos/precio)
 
 ---
 
