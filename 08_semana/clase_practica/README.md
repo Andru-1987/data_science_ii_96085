@@ -370,13 +370,15 @@ df[["metros_cuadrados","precio_usd","impuestos_anuales_usd"]].corr()
 
 La paradoja de Simpson es un fenómeno estadístico en el cual una tendencia que aparece en varios grupos de datos desaparece o se invierte completamente cuando los grupos se combinan.
 Ocurre generalmente cuando hay una variable oculta (llamada variable de confusión) que afecta los resultados y que no se está teniendo en cuenta a simple vista.
-------------------------------
+
+---
+
 ## Un ejemplo clásico para entenderlo (El sesgo de UC Berkeley)
 El caso real más famoso ocurrió en 1973 en la Universidad de California, Berkeley, cuando fueron acusados de discriminar a las mujeres en las admisiones de posgrado.
 Si mirabas los datos globales, la tendencia parecía clara:
 
-* Hombres aceptados: 44% [1]
-* Mujeres aceptadas: 35% [1]
+* Hombres aceptados: 44% 
+* Mujeres aceptadas: 35% 
 
 A simple vista, parecía haber un sesgo a favor de los hombres. Sin embargo, cuando los estadísticos analizaron los datos departamento por departamento (es decir, abriendo los grupos), descubrieron algo sorprendente: en la mayoría de las facultades, las mujeres tenían una tasa de aceptación igual o superior a la de los hombres.
 ## ¿Por qué pasó esto? (La variable oculta)
@@ -386,7 +388,8 @@ La variable de confusión fue el tipo de carrera al que postulaban:
 * Los hombres tendían a postularse a departamentos con cuotas de aceptación muy altas (como Ingeniería o Ciencias), donde casi todos eran aceptados.
 
 Al combinar todos los datos en una sola bolsa, el gran volumen de mujeres rechazadas en carreras difíciles hizo que la tasa general femenina se desplomara, creando una ilusión óptica estadística.
-------------------------------
+
+
 ## ¿Cómo se aplica a tus datos de propiedades?
 Imaginá que estás analizando el precio por metro cuadrado ($/m²) de Casas y Departamentos, y descubrís lo siguiente:
 
@@ -409,7 +412,7 @@ Con el mismo espíritu del dataset (dos "agencias" vendiendo propiedades, y la v
 
 ---
 
-## Resumen de hallazgos para cerrar la clase
+## Resumen de hallazgos
 
 1. `precio_usd` es asimétrico y leptocúrtico → requiere transformación log antes de modelar.
 2. El tamaño (m²) explica el precio moderadamente (r=0.64); el tipo de propiedad también influye (ANOVA significativo); barrio y tipo son independientes entre sí.
