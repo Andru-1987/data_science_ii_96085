@@ -3,10 +3,10 @@ name = "data-science-ii-96085"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.13"
 dependencies = [
     "ipython>=9.17.1",
     "matplotlib>=3.11.1",
+    "nbformat>=5.11.1",
     "pandas>=3.0.5",
     "plotly>=7.0.0",
     "psycopg2-binary>=2.9.12",
@@ -14,17 +14,9 @@ dependencies = [
     "python-dotenv>=1.2.2",
     "requests>=2.34.2",
     "robyn>=0.88.0",
+    "scikit-learn>=1.9.1",
     "spicy>=0.16.0",
     "sqlalchemy>=2.0.51",
     "statsmodels>=0.15.0",
 ]
 
-[tool.uv.workspace]
-members = [
-    "07_semana/clase_practica",
-]
-
-[dependency-groups]
-dev = [
-    "ipython>=9.17.1",
-]
